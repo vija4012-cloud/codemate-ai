@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeMate AI | Coding Assistant</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #0b1020;
+            color: #edf2ff;
+            min-height: 100vh;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 22px 7%;
+            border-bottom: 1px solid #252d44;
+            background: #10172b;
+        }
+
+        .logo {
+            font-size: 25px;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+
+        .logo span {
+            color: #8b9cff;
+        }
+
+        .badge {
+            background: #192a36;
+            color: #67e8b5;
+            border: 1px solid #285647;
+            padding: 7px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .container {
+            max-width: 1250px;
+            margin: 40px auto;
+            padding: 0 24px;
+        }
+
+        .hero {
+            margin-bottom: 30px;
+        }
+
+        .hero h1 {
+            font-size: clamp(30px, 5vw, 48px);
+            margin: 0 0 12px;
+        }
+
+        .hero h1 span {
+            color: #9ba9ff;
+        }
+
+        .hero p {
+            color: #9ba8c7;
+            font-size: 16px;
+            line-height: 1.7;
+        }
+
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 22px;
+        }
+
+        .panel {
+            background: #121a30;
+            border: 1px solid #293451;
+            border-radius: 16px;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        .panel-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid #293451;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .panel-header h2 {
+            margin: 0;
+            font-size: 16px;
+        }
+
+        .panel-content {
+            padding: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            color: #b6c1dc;
+            margin-bottom: 9px;
+        }
+
+        select, textarea {
+            width: 100%;
+            border: 1px solid #34415f;
+            background: #0b1224;
+            color: #edf2ff;
+            border-radius: 10px;
+            padding: 13px;
+            font: inherit;
+        }
+
+        select {
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        textarea {
+            min-height: 280px;
+            resize: vertical;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        textarea:focus, select:focus {
+            outline: 2px solid #7c8cff;
+            outline-offset: 1px;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        button {
+            border: 0;
+            border-radius: 9px;
+            padding: 12px;
+            cursor: pointer;
+            font-weight: 650;
+            font-size: 13px;
+            transition: transform 0.15s, opacity 0.15s;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: wait;
+            opacity: 0.6;
+            transform: none;
+        }
+
+        .action-btn {
+            color: #dce3ff;
+            background: #202b48;
+            border: 1px solid #344365;
+        }
+
+        .action-btn:hover {
+            background: #2b385b;
+        }
+
+        .primary-btn {
+            background: #8997ff;
+            color: #0b1020;
+        }
+
+        .output {
+            min-height: 340px;
+            padding: 18px;
+            border-radius: 10px;
+            background: #0b1224;
+            border: 1px solid #293451;
+            color: #d4def8;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            line-height: 1.8;
+            font-size: 14px;
+            font-family: "Segoe UI", Arial, sans-serif;
+        }
+
+        .placeholder {
+            color: #71809f;
+        }
+
+        .status {
+            margin-top: 14px;
+            font-size: 13px;
+            color: #9ba8c7;
+            min-height: 20px;
+        }
+
+        .output code {
+            font-family: Consolas, "Courier New", monospace;
+        }
+
+        .output pre {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            background: #141e36;
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        footer {
+            text-align: center;
+            color: #71809f;
+            padding: 28px 16px;
+            font-size: 13px;
+        }
+
+        @media (max-width: 800px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                padding: 18px 5%;
+            }
+
+            .container {
+                margin-top: 28px;
+                padding: 0 16px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .actions {
+                grid-template-columns: 1fr;
+            }
+
+            .badge {
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="logo">CodeMate <span>AI</span></div>
+        <div class="badge">● Local AI Connected</div>
+    </header>
+
+    <main class="container">
+        <section class="hero">
+            <h1>Your AI <span>Coding Partner.</span></h1>
+            <p>
+                Understand code, detect bugs, improve quality, and generate
+                unit tests with your AI-powered coding assistant.
+            </p>
+        </section>
+
+        <section class="workspace">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Code Workspace</h2>
+                    <span style="color:#8b9cff;font-size:12px;">EDITOR</span>
+                </div>
+
+                <div class="panel-content">
+                    <label for="language">Programming Language</label>
+
+                    <select id="language">
+                        <option>Python</option>
+                        <option>C</option>
+                        <option>C++</option>
+                        <option>Java</option>
+                        <option>JavaScript</option>
+                        <option>TypeScript</option>
+                        <option>PHP</option>
+                        <option>Go</option>
+                        <option>Rust</option>
+                        <option>SQL</option>
+                    </select>
+
+                    <label for="code">Enter your code</label>
+
+                    <textarea id="code" spellcheck="false" placeholder="Paste your code here...">for i in range(5):
+    print(i)</textarea>
+
+                    <div class="actions">
+                        <button class="action-btn" data-action="Explain Code">
+                            📝 Explain Code
+                        </button>
+
+                        <button class="action-btn" data-action="Find Bugs">
+                            🐛 Find Bugs
+                        </button>
+
+                        <button class="action-btn" data-action="Code Review">
+                            🔍 Code Review
+                        </button>
+
+                        <button class="action-btn" data-action="Optimize Code">
+                            ⚡ Optimize Code
+                        </button>
+
+                        <button class="action-btn" data-action="Generate Unit Tests">
+                            🧪 Generate Tests
+                        </button>
+
+                        <button class="primary-btn" id="analyzeAll">
+                            ✨ Explain Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>AI Analysis</h2>
+                    <span style="color:#67e8b5;font-size:12px;">QWEN 2.5 CODER</span>
+                </div>
+
+                <div class="panel-content">
+                    <label>AI-generated response</label>
+
+                    <div class="output" id="output" aria-live="polite"><span class="placeholder">Your AI analysis will appear here.
+
+Choose an action to get started.</span></div>
+
+                    <div class="status" id="status" role="status"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        CodeMate AI · Built with FastAPI and Ollama · AI responses may contain errors.
+    </footer>
+
+    <script>
+        const codeInput = document.getElementById("code");
+        const languageInput = document.getElementById("language");
+        const output = document.getElementById("output");
+        const status = document.getElementById("status");
+        const actionButtons = document.querySelectorAll("[data-action]");
+        const analyzeAllButton = document.getElementById("analyzeAll");
+
+        async function analyzeCode(action) {
+            const code = codeInput.value.trim();
+
+            if (!code) {
+                status.textContent = "Please enter some code first.";
+                codeInput.focus();
+                return;
+            }
+
+            const buttons = [...actionButtons, analyzeAllButton];
+            buttons.forEach(button => button.disabled = true);
+
+            output.textContent = "Thinking... Your AI model is analyzing the code.";
+            status.textContent = "Connecting to your local AI model...";
+
+            try {
+                const response = await fetch("/api/analyze", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        code: code,
+                        language: languageInput.value,
+                        action: action
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || "Something went wrong.");
+                }
+
+                output.textContent = data.result;
+                status.textContent = "Analysis complete · Model: " + data.model;
+            } catch (error) {
+                output.textContent = "Unable to analyze your code.";
+                status.textContent = error.message +
+                    " Check that the backend and Ollama are running.";
+            } finally {
+                buttons.forEach(button => button.disabled = false);
+            }
+        }
+
+        actionButtons.forEach(button => {
+            button.addEventListener("click", () => {
+                analyzeCode(button.dataset.action);
+            });
+        });
+
+        analyzeAllButton.addEventListener("click", () => {
+            analyzeCode("Explain Code");
+        });
+    </script>
+</body>
+</html>
