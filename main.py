@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import requests
@@ -6,17 +7,17 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-app = FastAPI(
-    title="CodeMate AI",
-    description="An AI-powered coding assistant and code reviewer",
-    version="1.0.0",
-)
-
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-MODEL_NAME = "qwen2.5-coder:7b"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
+LOCAL_OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+LOCAL_MODEL = "qwen2.5-coder:7b"
+
+app = FastAPI(title="CodeMate AI")
 
 
 class CodeRequest(BaseModel):
@@ -26,106 +27,138 @@ class CodeRequest(BaseModel):
 
 
 PROMPTS = {
-    "Explain Code": (
-        "Explain the following code clearly, step by step. "
-        "Describe its purpose and important concepts."
-    ),
-    "Find Bugs": (
-        "Analyze the following code for bugs, logical errors, and edge cases. "
-        "Explain each issue and provide corrected code where appropriate."
-    ),
-    "Code Review": (
-        "Review the following code for correctness, readability, maintainability, "
-        "security concerns, and coding best practices. Give actionable feedback."
-    ),
-    "Optimize Code": (
-        "Suggest ways to improve the performance and readability of the following "
-        "code. Explain the improvements and provide an optimized version."
-    ),
-    "Generate Unit Tests": (
-        "Generate useful unit tests for the following code, including normal cases, "
-        "edge cases, and invalid inputs where relevant. State any assumptions."
-    ),
+    "Explain Code": "Explain the following code clearly, step by step.",
+    "Find Bugs": "Find bugs and errors in the following code. Explain the problems and suggest fixes.",
+    "Code Review": "Review the following code for readability, maintainability, security, and best practices.",
+    "Optimize Code": "Optimize the following code for performance and readability. Explain the improvements.",
+    "Generate Unit Tests": "Generate useful unit tests for the following code, including normal and edge cases.",
 }
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "app": "CodeMate AI", "model": MODEL_NAME}
+    return {
+        "status": "ok",
+        "app": "CodeMate AI",
+        "provider": "Groq" if GROQ_API_KEY else "Ollama",
+        "model": GROQ_MODEL if GROQ_API_KEY else LOCAL_MODEL,
+    }
 
 
 @app.post("/api/analyze")
 def analyze_code(request: CodeRequest):
-    if not request.code.strip():
+    code = request.code.strip()
+
+    if not code:
         raise HTTPException(status_code=400, detail="Please enter some code.")
 
     if request.action not in PROMPTS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported action. Choose one of: {', '.join(PROMPTS)}",
-        )
+        raise HTTPException(status_code=400, detail="Invalid action selected.")
 
-    prompt = (
-        f"{PROMPTS[request.action]}\n\n"
-        f"Programming language: {request.language}\n\n"
-        f"Code:\n```{request.language.lower()}\n"
-        f"{request.code}\n```\n\n"
-        "Format your response using clear headings and code blocks where useful. "
-        "Do not claim to have executed the code unless you actually have."
-    )
+    prompt = f"""
+You are CodeMate AI, an expert programming assistant.
+
+Programming language: {request.language}
+Task: {PROMPTS[request.action]}
+
+Analyze the code below. Give a clear, useful answer with headings or examples when appropriate.
+
+CODE:
+{code}
+"""
 
     try:
-        response = requests.post(
-            OLLAMA_URL,
-            json={
-                "model": MODEL_NAME,
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": False,
-                "options": {"temperature": 0.2},
-            },
-            timeout=180,
-        )
-        response.raise_for_status()
-        result = response.json()
-        answer = result.get("message", {}).get("content", "")
-
-        if not answer:
-            raise HTTPException(
-                status_code=502,
-                detail="The AI model returned an empty response.",
+        if GROQ_API_KEY:
+            response = requests.post(
+                GROQ_API_URL,
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": GROQ_MODEL,
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are CodeMate AI, a helpful expert coding assistant.",
+                        },
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.2,
+                },
+                timeout=120,
             )
 
-        return {"result": answer, "model": MODEL_NAME}
+            if response.status_code in (401, 403):
+                raise HTTPException(
+                    status_code=502,
+                    detail="Groq authentication failed. Check the GROQ_API_KEY environment variable.",
+                )
 
-    except requests.exceptions.ConnectionError:
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Cannot connect to Ollama. Make sure Ollama is running "
-                "on this computer."
-            ),
-        )
+            if response.status_code == 429:
+                raise HTTPException(
+                    status_code=429,
+                    detail="Groq rate limit or quota reached. Check your Groq account and try again later.",
+                )
+
+            response.raise_for_status()
+            result = response.json()["choices"][0]["message"]["content"]
+            model_used = GROQ_MODEL
+
+        else:
+            response = requests.post(
+                LOCAL_OLLAMA_URL,
+                json={
+                    "model": LOCAL_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                    "options": {"temperature": 0.2},
+                },
+                timeout=180,
+            )
+            response.raise_for_status()
+            result = response.json()["message"]["content"]
+            model_used = LOCAL_MODEL
+
+        return {
+            "success": True,
+            "action": request.action,
+            "result": result,
+            "model": model_used,
+        }
+
+    except HTTPException:
+        raise
     except requests.exceptions.Timeout:
         raise HTTPException(
             status_code=504,
-            detail="The AI model took too long to respond. Please try again.",
+            detail="The AI service took too long to respond. Please try again.",
         )
-    except requests.exceptions.HTTPError:
+    except requests.exceptions.ConnectionError:
         raise HTTPException(
             status_code=502,
-            detail="Ollama returned an error. Check that the model is installed.",
+            detail="Could not connect to the AI service. Check your internet connection or ensure Ollama is running.",
+        )
+    except requests.exceptions.HTTPError as exc:
+        error_detail = "The AI service returned an error."
+        if exc.response is not None:
+            try:
+                error_detail = exc.response.json().get("error", {}).get(
+                    "message", error_detail
+                )
+            except ValueError:
+                pass
+        raise HTTPException(status_code=502, detail=error_detail)
+    except (KeyError, ValueError):
+        raise HTTPException(
+            status_code=502,
+            detail="The AI service returned an unexpected response.",
         )
 
 
 @app.get("/")
 def home():
-    index_file = STATIC_DIR / "index.html"
-    if not index_file.exists():
-        return {
-            "message": "CodeMate AI backend is running!",
-            "next_step": "Create static/index.html for the frontend.",
-        }
-    return FileResponse(index_file)
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
